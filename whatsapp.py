@@ -13,12 +13,12 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 
-filename = 'chat2.txt'
+filename = 'chat.txt'
 
 #TODO: accept command line arguments via sys.argv
 #TODO: validate input file?
 ## open chat and stopwords, remove punctuation.
-f = open(filename,'r', encoding='UTF-8')
+f = open(filename,'r', encoding='UTF-8-sig')
 messages = f.read().split('\n')
 
 f = open('stopwords.txt','r', encoding='UTF-8')
@@ -27,12 +27,18 @@ stop_words = ["".join(s for s in str if s not in string.punctuation) for str in 
 stop_words.append("<media>")
 stop_words.append("<link>")
 
-## decompose messages into date, speaker, text
-# message like: 2018-01-02, 10:25 AM - Alex Jew: this is my message
-#TODO: accept alternate datetime formats in the exported log
+## determine datetime format, then group messages into date, speaker, text
+# message like:       2018-01-21, 10:25 AM - Alex Jew: this is my message
+# alternate datetime: 21/01/2018, 10:25 AM - Alex Jew: this is my message
+# assume datetime can only be one of two formats
+if '/' in messages[0][:10]:
+    date_format = "%d/%m/%Y, %I:%M %p"
+else:
+    date_format = "%Y-%m-%d, %I:%M %p"
+
+pattern = re.compile("(.*) - ([\w ]*):{1} (.*)")
+
 raw_chat = []
-pattern = re.compile("([0-9-]*, [0-9:]* .*) - ([\w ]*):{1} (.*)") #TODO simplify pattern?
-date_format = "%Y-%m-%d, %I:%M %p"
 for msg in messages:
     grouped_msg = pattern.match(msg)
     
@@ -80,10 +86,10 @@ for speaker in user_words:
         except KeyError:
             all_words[word] = user_words[speaker][word]
     
-# sort dictionaries by word occurence
+# sort dictionaries by word occurence. tuples, then back to dict.
 all_words = sorted(all_words.items(), key=lambda x: x[1], reverse=True)
 all_words = dict(all_words)
-for user in user_words: #note - dict becomes ordered tuples
+for user in user_words:
     user_words[user] = sorted(user_words[user].items(), key=lambda x: x[1], reverse=True)
     user_words[user] = dict(user_words[user])
     
@@ -182,12 +188,15 @@ def print_weighted_words():
     
 def print_message_uniqueness():
     """Print each speaker's unique words per message."""
-    #TODO: sort output by unique words/message
+    uniqueness = []
     print('Unique words per message:')
     for speaker in user_words:
         unique_words = len(user_words[speaker])
         total_messages = chat[chat['speaker'] == speaker].shape[0]
-        print("{:<15}{}".format(speaker, round(unique_words/total_messages,3)))
+        uniqueness.append((speaker, unique_words/total_messages))
+    uniqueness = sorted(uniqueness, key = lambda x:x[1], reverse=True)
+    for u in uniqueness:
+        print("{:<15}{}".format(u[0], round(u[1],3)))
     print()
 
 def print_chat_top_words(top=10):
